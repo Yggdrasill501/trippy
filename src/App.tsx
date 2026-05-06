@@ -1,11 +1,9 @@
 import "./index.css";
 
+import { Landing } from "@/components/landing/Landing";
+
 export function App() {
-  return (
-    <main className="container mx-auto p-8">
-      <h1 className="text-3xl font-bold">Trippy</h1>
-    </main>
-  );
+  return <Landing />;
 }
 
 export default App;

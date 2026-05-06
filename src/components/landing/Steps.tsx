@@ -1,4 +1,4 @@
-import { CheckCircle2, Plane, Search } from "lucide-react";
+import { CircleCheckBig, Plane, Search } from "lucide-react";
 
 import { Container } from "@/components/primitives/Container";
 import { Eyebrow } from "@/components/primitives/Eyebrow";
@@ -19,7 +19,7 @@ const steps = [
     body: "Confirm fare, pay, and lock the seat — all inside the conversation. Idempotent, with full audit trail.",
   },
   {
-    icon: CheckCircle2,
+    icon: CircleCheckBig,
     eyebrow: "03",
     title: "Check in",
     body: "When the window opens, Trippy checks you in, picks the seat you wanted, and drops the boarding pass in chat.",
