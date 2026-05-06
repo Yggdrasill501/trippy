@@ -17,9 +17,28 @@ bunx --bun shadcn@latest add <component>   # add a shadcn/ui component into src/
 
 There is no separate lint/typecheck script. For typechecking, run `bunx tsc --noEmit`.
 
+Smoke-test the running server:
+
+```bash
+curl -sS http://localhost:3000/api/hello
+curl -sS -X POST http://localhost:3000/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
 ## Architecture
 
-**Single Bun process serves both frontend and API.** `src/index.ts` calls `Bun.serve({ routes })` and maps `"/*": index` where `index` is imported directly from `src/index.html`. Bun handles bundling on demand in dev and via `build.ts` for production — there is no Vite, webpack, or esbuild config. Add API routes alongside the `"/*"` route in `src/index.ts`.
+**Single Bun process serves the SPA, the HTTP API, and the MCP server.** `src/index.ts` calls `Bun.serve({ routes })` with three entries, in this order of specificity (Bun matches exact > param > wildcard):
+
+- `"/api/*"` and `"/mcp"` → `req => app.fetch(req)`, delegating to the Hono app in `src/server/app.ts`.
+- `"/*"` → `index` (imported from `src/index.html`), the SPA catch-all.
+
+Bun handles bundling of the SPA on demand in dev and via `build.ts` for production — there is no Vite, webpack, or esbuild config. **Do not** add a `"/*": index` wildcard above the `/api/*` entry; routes are matched by specificity, but a stray exact `/` mapping to `index` would also intercept other paths if reordered. Keep all server-side logic inside the Hono app.
+
+**Hono app (`src/server/app.ts`).** Owns every non-SPA route. New API endpoints go here as `app.get(...)`, `app.post(...)`, etc. The `/mcp` route is `app.all(...)`, since Streamable HTTP uses GET (SSE), POST (JSON-RPC), and DELETE (session terminate) on the same path.
+
+**MCP server (`src/server/mcp.ts`).** Exports a singleton `McpServer` from `@modelcontextprotocol/sdk`. Tools are added with `mcpServer.registerTool(name, { title, description, inputSchema }, handler)` where `inputSchema` is a Zod *raw shape* (`{ field: z.string() }`), not `z.object({...})`. The handler receives the parsed args and returns `{ content: [{ type: "text", text }] }`. The transport (`StreamableHTTPTransport` from `@hono/mcp`) is created once in `app.ts` and connected lazily on the first request via `mcpServer.isConnected()` — this is the stateless pattern; if you need per-session state, switch to creating a transport per request and tracking session IDs.
 
 **HTML-driven entry chain.** `src/index.html` loads `./frontend.tsx`, which mounts `<App />` into `#root`. Bun transpiles `.tsx` automatically when imported from HTML. `frontend.tsx` uses `import.meta.hot.data` to keep the React root across HMR reloads — do not replace this with a plain `createRoot(...).render(...)` or HMR will remount the tree on every change.
 
